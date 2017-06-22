@@ -1,7 +1,6 @@
-require_relative '../lib/bloc_works.rb'
+require 'bloc_works'
 require 'test/unit'
 require 'rack/test'
-
 
 class HomepageTest < Test::Unit::TestCase
   include Rack::Test::Methods
@@ -12,7 +11,6 @@ class HomepageTest < Test::Unit::TestCase
 
   def test_status
     get '/'
-    assert last_response.ok?
     assert_equal(200, last_response.status)
   end
 
