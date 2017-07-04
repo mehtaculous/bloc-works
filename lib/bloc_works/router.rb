@@ -8,11 +8,9 @@ module BlocWorks
       [Object.const_get(controller), action]
     end
 
-    # controller_class, action_name = controller_and_action(env)
-
     def fav_icon(env)
       if env['PATH_INFO'] == '/favicon.ico'
-        return [404, {'Content-Type' => 'text/html'}, ["No favicon found"]]
+        return [404, {'Content-Type' => 'text/html'}, []]
       end
     end
   end
