@@ -1,4 +1,4 @@
-require "erubis"
+require 'erubis'
  
 module BlocWorks
   class Controller
@@ -10,7 +10,12 @@ module BlocWorks
       filename = File.join("app", "views", controller_dir, "#{view}.html.erb")
       template = File.read(filename)
       eruby = Erubis::Eruby.new(template)
-      eruby.result(locals.merge(env: @env))
+
+      self.instance_variables.each do |instance_variable_name|
+        locals[instance_variable_name] = self.instance_variable_get(instance_variable_name)
+      end
+
+      eruby.result(locals)
     end
 
     def controller_dir 
