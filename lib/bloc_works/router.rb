@@ -24,7 +24,7 @@ module BlocWorks
         raise "No routes defined"
       end
  
-      @router.look_up_url(env["PATH_INFO"])
+      @router.look_up_url(env["PATH_INFO"], env["REQUEST_METHOD"])
     end
   end
 
@@ -34,22 +34,34 @@ module BlocWorks
     end
  
     def map(url, *args)
-      options = {}
-      options = args.pop if args[-1].is_a?(Hash)
-      options[:default] ||= {}
-      # if options[:default].nil?
-      #   options[:default] = {}
-      # end
-
-      destination = nil
-      destination = args.pop if args.size > 0
-      raise "Too many args!" if args.size > 0
+      options = options_setter(args)
+      destination = destination_setter(args)
  
       parts = url.split("/")
       parts.reject! { |part| part.empty? }
 
-      vars, regex_parts = [], []
+      vars, regex_parts = parts_handler(parts)
  
+      regex = regex_parts.join("/")
+      @rules.push({ regex: Regexp.new("^/#{regex}$"), vars: vars, destination: destination, options: options })
+    end
+
+    def options_setter(args)
+      options = {}
+      options = args.pop if args[-1].is_a?(Hash)
+      options[:default] ||= {}
+      options
+    end
+
+    def destination_setter(args)
+      destination = nil
+      destination = args.pop if args.size > 0
+      raise "Too many args!" if args.size > 0
+      return destination
+    end
+
+    def parts_handler(parts)
+      vars, regex_parts = [], []
       parts.each do |part|
         case part[0]
         when ":"
@@ -62,35 +74,45 @@ module BlocWorks
           regex_parts << part
         end
       end
- 
-      regex = regex_parts.join("/")
-      @rules.push({ regex: Regexp.new("^/#{regex}$"), vars: vars, destination: destination, options: options })
+
+      return vars, regex_parts
     end
 
-    def look_up_url(url)
+    def look_up_url(url, request_method)
       @rules.each do |rule|
         rule_match = rule[:regex].match(url)
- 
-        if rule_match
-          options = rule[:options]
-          params = options[:default].dup
- 
-          rule[:vars].each_with_index do |var, index|
-            params[var] = rule_match.captures[index]
-          end
- 
-          if rule[:destination]
-            return get_destination(rule[:destination], params)
-          else
-            controller = params["controller"]
-            action = params["action"]
-            return get_destination("#{controller}##{action}", params)
-          end
+        request_match = rule[:options][:default][:request_method].match(request_method)
+        if rule_match && request_match
+          params = set_params(rule, rule_match)
+          return set_destination(rule, params)
         end
+      end
+
+      proc { |env| [404, {}, [""]] }
+    end
+
+    def set_params(rule, rule_match)
+      options = rule[:options]
+      params = options[:default].dup
+
+      rule[:vars].each_with_index do |var, index|
+        params[var] = rule_match.captures[index]
+      end
+
+      return params
+    end
+
+    def set_destination(rule, params)
+      if rule[:destination]
+        return get_destination(rule[:destination], params)
+      else
+        controller = params["controller"]
+        action = params["action"]
+        return get_destination("#{controller}##{action}", params)
       end
     end
  
-    def get_destination(destination, routing_params = {})
+    def get_destination(destination, routing_params={})
       if destination.respond_to?(:call)
         return destination
       end
@@ -100,7 +122,17 @@ module BlocWorks
         controller = Object.const_get("#{name}Controller")
         return controller.action($2, routing_params)
       end
-      raise "Destination no found: #{destination}"
+      raise "Destination not found: #{destination}"
+    end
+
+    def resources(controller)
+      map ":controller",          default: {"action" => "index", :request_method => "GET"}
+      map ":controller/new",      default: {"action" => "new", :request_method => "GET"}
+      map ":controller/:id/edit", default: {"action" => "edit", :request_method => "GET"}
+      map ":controller/:id",      default: {"action" => "show", :request_method => "GET"}
+      map ":controller",          default: {"action" => "create", :request_method => "PUT"}
+      map ":controller/:id",      default: {"action" => "update", :request_method => "POST"}
+      map ":controller/:id",      default: {"action" => "destroy", :request_method => "DELETE"}
     end
   end
 end

@@ -8,11 +8,13 @@ class BlocWorksTest < Test::Unit::TestCase
   include Rack::Test::Methods
 
   def app
-    BlocWorks::Application.new
+    app = BlocWorks::Application.new
+    app.route { map ":controller/:action" }
+    app
   end
 
   def test_routing
-    get '/test/welcome'
+    get 'test/welcome'
     assert last_response.ok?
     assert_equal("Hello Blocheads!", last_response.body)
   end
@@ -20,5 +22,8 @@ class BlocWorksTest < Test::Unit::TestCase
   def test_favicon
     get '/favicon.ico'
     assert_equal(404, last_response.status)
+  end
+
+  def test_redirect_to
   end
 end
